@@ -15,7 +15,7 @@ pub use self::cell::Cell;
 pub use self::highlight_spacing::HighlightSpacing;
 pub use self::row::Row;
 pub use self::state::TableState;
-use crate::block::{Block, BlockExt, Padding};
+use crate::block::{Block, BlockExt};
 
 mod cell;
 mod highlight_spacing;
