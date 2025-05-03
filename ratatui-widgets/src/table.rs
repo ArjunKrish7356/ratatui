@@ -15,7 +15,7 @@ pub use self::cell::Cell;
 pub use self::highlight_spacing::HighlightSpacing;
 pub use self::row::Row;
 pub use self::state::TableState;
-use crate::block::{Block, BlockExt};
+use crate::block::{Block, BlockExt, Padding};
 
 mod cell;
 mod highlight_spacing;
@@ -269,6 +269,9 @@ pub struct Table<'a> {
 
     /// Controls how to distribute extra space among the columns
     flex: Flex,
+
+    /// How many items to try to keep visible before and after the selected item
+    scroll_padding: usize,
 }
 
 impl Default for Table<'_> {
@@ -287,6 +290,7 @@ impl Default for Table<'_> {
             highlight_symbol: Text::default(),
             highlight_spacing: HighlightSpacing::default(),
             flex: Flex::Start,
+            scroll_padding: 0,
         }
     }
 }
@@ -718,6 +722,29 @@ impl<'a> Table<'a> {
     #[must_use = "method moves the value of self and returns the modified value"]
     pub const fn flex(mut self, flex: Flex) -> Self {
         self.flex = flex;
+        self
+    }
+
+    /// Sets the number of items around the currently selected item that should be kept visible
+    ///
+    /// This is a fluent setter method which must be chained or used as it consumes self
+    ///
+    /// # Example
+    ///
+    /// A padding value of 1 will keep 1 item above and 1 item bellow visible if possible
+    ///
+    /// ```rust
+    /// use ratatui::widgets::{Row, Table};
+    ///
+    /// let rows = [
+    ///     Row::new(vec!["Cell1", "Cell2"]),
+    ///     Row::new(vec!["Cell3", "Cell4"]),
+    /// ];
+    /// let table = Table::default().rows(rows).scroll_padding(1);
+    /// ```
+    #[must_use = "method moves the value of self and returns the modified value"]
+    pub const fn scroll_padding(mut self, padding: usize) -> Self {
+        self.scroll_padding = padding;
         self
     }
 }
