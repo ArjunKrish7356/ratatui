@@ -940,6 +940,7 @@ impl Table<'_> {
     fn visible_rows(&self, state: &TableState, area: Rect) -> (usize, usize) {
         let last_row = self.rows.len().saturating_sub(1);
         let mut start = state.offset.min(last_row);
+        let scroll_padding = self.scroll_padding;
 
         if let Some(selected) = state.selected {
             start = start.min(selected);
@@ -960,14 +961,25 @@ impl Table<'_> {
             let selected = selected.min(last_row);
 
             // scroll down until the selected row is visible
-            while selected >= end {
-                height = height.saturating_add(self.rows[end].height_with_margin());
+            while selected + scroll_padding >= end && end < self.rows.len() {
+                height += self.rows[end].height_with_margin();
                 end += 1;
-                while height > area.height {
-                    height = height.saturating_sub(self.rows[start].height_with_margin());
+                while height > area.height && start < end {
+                    height -= self.rows[start].height_with_margin();
                     start += 1;
                 }
             }
+
+            // scroll up until the selected row is visible
+            while selected.saturating_sub(scroll_padding) < start && start > 0 {
+                start = start.saturating_sub(1);
+                height += self.rows[start].height_with_margin();
+                while height > area.height && end > start {
+                    end -= 1;
+                    height = height.saturating_sub(self.rows[end].height_with_margin());
+                }
+            }
+
         }
 
         // Include a partial row if there is space
