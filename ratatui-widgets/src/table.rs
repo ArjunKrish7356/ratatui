@@ -962,7 +962,7 @@ impl Table<'_> {
 
             // scroll down until the selected row is visible
             while selected + scroll_padding >= end && end < self.rows.len() {
-                height += self.rows[end].height_with_margin();
+                height = height.saturating_add(self.rows[end].height_with_margin());
                 end += 1;
                 while height > area.height && start < end {
                     height -= self.rows[start].height_with_margin();
@@ -973,13 +973,12 @@ impl Table<'_> {
             // scroll up until the selected row is visible
             while selected.saturating_sub(scroll_padding) < start && start > 0 {
                 start = start.saturating_sub(1);
-                height += self.rows[start].height_with_margin();
+                height = height.saturating_add(self.rows[start].height_with_margin());
                 while height > area.height && end > start {
                     end -= 1;
                     height = height.saturating_sub(self.rows[end].height_with_margin());
                 }
             }
-
         }
 
         // Include a partial row if there is space
@@ -2311,5 +2310,149 @@ mod tests {
             .footer(footer);
         let column_count = table.column_count();
         assert_eq!(column_count, expected);
+    }
+
+    #[rstest]
+    #[case::no_padding(4, 2, 0, Some(2), Buffer::with_lines(vec![">> 2 ", "   3 ", "   4 ", "   5 "]))]
+    #[case::one_before(
+        4,
+        2,
+        1,
+        Some(2),
+        Buffer::with_lines(vec!["   1 ", ">> 2 ", "   3 ", "   4 "])
+    )]
+    #[case::check_padding_overflow(
+        4,
+        1,
+        2,
+        Some(4),
+        Buffer::with_lines(vec!["   2 ", "   3 ", ">> 4 ", "   5 "])
+    )]
+    #[case::no_padding_offset_behavior(
+        5,
+        2,
+        0,
+        Some(3),
+        Buffer::with_lines(vec!["   2 ", ">> 3 ", "   4 ", "   5 ", "   6 "])
+    )]
+    #[case::two_before(
+        5,
+        2,
+        2,
+        Some(3),
+        Buffer::with_lines(vec!["   1 ", "   2 ", ">> 3 ", "   4 ", "   5 "])
+    )]
+    #[case::keep_selected_visible(
+        4,
+        0,
+        4,
+        Some(1),
+        Buffer::with_lines(vec!["   0 ", ">> 1 ", "   2 ", "   3 "])
+    )]
+
+    fn test_padding(
+        #[case] render_height: u16,
+        #[case] offset: usize,
+        #[case] padding: usize,
+        #[case] selected: Option<usize>,
+        #[case] expected: Buffer,
+    ) {
+        let rows = (0..8).map(|i| Row::new([i.to_string()]));
+        let table = Table::new(rows, [Constraint::Length(2)])
+            .scroll_padding(padding)
+            .highlight_symbol(">> ");
+        let mut buf = Buffer::empty(Rect::new(0, 0, 5, render_height));
+        let mut state = TableState::new()
+            .with_offset(offset)
+            .with_selected(selected);
+
+        StatefulWidget::render(
+            table.clone(),
+            Rect::new(0, 0, 5, render_height),
+            &mut buf,
+            &mut state,
+        );
+
+        assert_eq!(expected, buf);
+    }
+
+    #[test]
+    fn scroll_offset_remains_stable_after_multiple_renders() {
+        let mut buffer = Buffer::empty(Rect::new(0, 0, 10, 5));
+        let mut state = TableState::default();
+
+        *state.offset_mut() = 2;
+        state.select(Some(4));
+
+        let rows = (0..8).map(|i| Row::new([i.to_string()]));
+        let list = Table::new(rows, [Constraint::Length(2)])
+            .scroll_padding(3)
+            .highlight_symbol(">> ");
+
+        StatefulWidget::render(&list, buffer.area, &mut buffer, &mut state);
+
+        let offset_after_render = state.offset();
+
+        StatefulWidget::render(&list, buffer.area, &mut buffer, &mut state);
+
+        assert_eq!(offset_after_render, state.offset());
+    }
+
+    #[test]
+    fn renders_padding_and_highlight_correctly_with_multiline_rows() {
+        let mut buffer = Buffer::empty(Rect::new(0, 0, 10, 3));
+        let mut state = TableState::default().with_offset(0).with_selected(Some(3));
+
+        let items = [
+            Row::new(["Item 0"]),
+            Row::new(["Item 1"]),
+            Row::new(["Item 2"]),
+            Row::new(["Item 3"]),
+            Row::new(["Item 4\nTest\nTest"]),
+            Row::new(["Item 5"]),
+        ];
+        let list = Table::new(items, [Constraint::Length(7)])
+            .scroll_padding(1)
+            .highlight_symbol(">> ");
+
+        StatefulWidget::render(list, buffer.area, &mut buffer, &mut state);
+
+        #[rustfmt::skip]
+        let expected = [
+            "   Item 2 ",
+            ">> Item 3 ",
+            "   Item 4 ",
+        ];
+        assert_eq!(buffer, Buffer::with_lines(expected));
+    }
+
+    #[test]
+    fn maintains_correct_scroll_offset_with_large_initial_rows() {
+        let mut buffer = Buffer::empty(Rect::new(0, 0, 10, 4));
+        let mut state = TableState::default();
+
+        *state.offset_mut() = 1;
+        state.select(Some(2));
+
+        let items = [
+            Row::new(["Item 0\nTest\nTest"]),
+            Row::new(["Item 1"]),
+            Row::new(["Item 2"]),
+            Row::new(["Item 3"]),
+        ];
+        let table = Table::new(items, [Constraint::Length(10)])
+            .scroll_padding(2)
+            .highlight_symbol(">> ");
+
+        StatefulWidget::render(table, buffer.area, &mut buffer, &mut state);
+        #[rustfmt::skip]
+        assert_eq!(
+            buffer,
+            Buffer::with_lines([
+                "   Item 0 ",
+                "   Item 1 ",
+                ">> Item 2 ",
+                "   Item 3 "])
+        );
     }
 }
