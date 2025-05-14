@@ -2313,25 +2313,25 @@ mod tests {
     }
 
     #[rstest]
-    #[case::no_padding(4, 2, 0, Some(2), Buffer::with_lines(vec![">> 2 ", "   3 ", "   4 ", "   5 "]))]
+    #[case::no_padding(4, 0, 2, Some(2), Buffer::with_lines(vec![">> 2 ", "   3 ", "   4 ", "   5 "]))]
     #[case::one_before(
         4,
-        2,
         1,
+        2,
         Some(2),
         Buffer::with_lines(vec!["   1 ", ">> 2 ", "   3 ", "   4 "])
     )]
     #[case::check_padding_overflow(
         4,
-        1,
         2,
+        1,
         Some(4),
         Buffer::with_lines(vec!["   2 ", "   3 ", ">> 4 ", "   5 "])
     )]
     #[case::no_padding_offset_behavior(
         5,
-        2,
         0,
+        2,
         Some(3),
         Buffer::with_lines(vec!["   2 ", ">> 3 ", "   4 ", "   5 ", "   6 "])
     )]
@@ -2344,16 +2344,16 @@ mod tests {
     )]
     #[case::keep_selected_visible(
         4,
-        0,
         4,
+        0,
         Some(1),
         Buffer::with_lines(vec!["   0 ", ">> 1 ", "   2 ", "   3 "])
     )]
 
     fn test_padding(
         #[case] render_height: u16,
-        #[case] offset: usize,
         #[case] padding: usize,
+        #[case] offset: usize,
         #[case] selected: Option<usize>,
         #[case] expected: Buffer,
     ) {
